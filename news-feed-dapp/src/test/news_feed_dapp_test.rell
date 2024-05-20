@@ -1,0 +1,94 @@
+@test module;
+
+import main.*;
+
+val alice = rell.test.pubkeys.alice;
+val bob = rell.test.pubkeys.bob;
+val charlie = rell.test.pubkeys.charlie;
+
+function test_create_entities(){
+    print("alice:",alice);
+    print("bob:",bob);
+    rell.test.tx()
+             .op(create_user("alice", alice))
+             .op(create_user("bob", bob))
+             .run();
+    
+    assert_equals(user @ {} (@sum 1), 2);
+
+    rell.test.tx()
+             .op(follow_user(alice, bob))
+             .op(make_post(alice, "my post"))
+             .run();
+    
+    assert_equals(follower @ { } (@sum 1), 1);
+    assert_equals(post @ {} (@sum 1), 1);
+
+    rell.test.tx()
+             .op(unfollow_user(alice, bob))
+             .run();
+
+    assert_equals(follower @ {} (@sum 1), 0);
+}
+
+function test_get_user_name() {
+    rell.test.tx()
+             .op(create_user("alice", alice))
+             .run();
+    assert_equals(get_user_name(alice), "alice#02466");
+}
+
+
+function test_get_users(){
+    rell.test.tx()
+             .op(create_user("alice", alice))
+             .run();
+    val result = get_users(0, 20);
+    assert_equals(result.users.size(), 1);
+    assert_equals(result.pointer, 1);
+    assert_true(result.users @* {} (.name).contains("alice#02466"));
+}
+
+function test_follower_calculation() {
+    rell.test.tx()
+             .op(create_user("alice", alice))
+             .op(create_user("bob", bob))
+             .op(create_user("charlie", charlie))
+             .run();
+
+    rell.test.tx()
+             .op(follow_user(alice, bob))
+             .op(follow_user(alice, charlie))
+             .run();
+    
+    assert_true(is_following(alice, bob));
+    assert_true(is_following(alice, charlie));
+    assert_equals(get_followers_count(bob),1);
+    assert_equals(get_followers_count(charlie), 1);
+    assert_equals(get_followers_count(alice), 0);
+
+    assert_equals(get_following_count(alice), 2);
+    assert_equals(get_following_count(bob), 0);
+    assert_equals(get_following_count(charlie), 0);
+}
+
+function test_pagination_of_posts() {
+    rell.test.tx()
+             .op(create_user("alice", alice))
+             .op(create_user("bob", bob))
+             .run();
+    
+    rell.test.tx().op(follow_user(alice, bob));
+
+    for (i in range(5)) {
+        rell.test.tx().op(make_post(bob, "content %d".format(i))).run();
+    }
+
+    val initial_posts = get_posts(alice, 0, 4);
+    assert_equals(initial_posts.pointer, 4);
+    assert_equals(initial_posts.posts.size(), 4);
+
+    val last_posts = get_posts(alice, initial_posts.pointer, 4);
+    assert_equals(last_posts.pointer, 5);
+    assert_equals(last_posts.posts.size(), 1);
+}

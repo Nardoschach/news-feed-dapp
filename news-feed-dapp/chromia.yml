@@ -1,0 +1,10 @@
+blockchains:
+  news-feed-dapp:
+    module: main
+compile:
+  rellVersion: 0.13.5
+database:
+  schema: schema_news_feed_dapp
+test:
+  modules:
+    - test
