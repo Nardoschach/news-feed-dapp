@@ -27,20 +27,32 @@ struct post_dto {
     content: text;
 }
 
+
+// helper functions
+
+function require_is_signer(pubkey) {
+    require(op_context.is_signer(pubkey), "user must sign this opration");
+}
+
+function format_user(user) = "%s#%s".format(user.name, user.id.to_hex().sub(0,5));
+
+function require_user(id: byte_array) = require(user @? {id}, "user with id %b does not exists".format(id));
+
 operation create_user(name: text, pubkey: byte_array) {
     create user(name, pubkey);
 }
 
 operation make_post(user_id: byte_array, content: text) {
-    create post(
-        user @ { .id == user_id },
-        content
-    );
+    require_is_signer(user_id);
+    require(content.size() <= 255, "a post can not be longer that 255 letters");
+    val user = require_user(user_id);
+    create post( user, content );
 }
 
 operation follow_user(user_id: byte_array, follow_id: byte_array) {
-    val user = user @ {user_id};
-    val follow = user @ {follow_id};
+    require_is_signer(user_id);
+    val user = require_user(user_id);
+    val follow = require_user(follow_id);
 
     create follower(
         user = follow,
@@ -49,8 +61,10 @@ operation follow_user(user_id: byte_array, follow_id: byte_array) {
 }
 
 operation unfollow_user(user_id: byte_array, unfollow_id: byte_array) {
-    val user = user @ { user_id };
-    val unfollow = user @ { unfollow_id};
+    require_is_signer(user_id);
+
+    val user = require_user(user_id);
+    val unfollow = require_user(unfollow_id);
     delete follower @? {
         .user == unfollow,
         .follower == user,
